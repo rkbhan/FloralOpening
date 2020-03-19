@@ -1,0 +1,252 @@
+---
+title: "Machine learning for high throughput image phenotyping"
+author: "Rongkui Han"
+date: "3/19/2020"
+output: 
+  html_document: 
+    keep_md: yes
+---
+
+### Load dataset.
+
+You can find the dataset in the repository
+```{r}
+library(ggplot2)
+library(GGally)
+library(gridExtra)
+allpix_plot = read.csv("/Users/rongkui/Desktop/Lab/Aim4_FloweringHour/Results/Labeled_pixel_samples.csv")
+
+allpix_pairs = allpix_plot[,c("H","S","V","label")]
+allpix_hour = allpix_plot[,c("H","S","V","hour")]
+allpix_hour$hour = as.factor(allpix_hour$hour)
+
+ggpairs(allpix_pairs, aes(colour = label, alpha = 0.4), title = "(a)")
+ggpairs(allpix_hour, aes(colour = hour, alpha = 0.4), title = "(b)")
+
+table(allpix_plot$label, allpix_plot$hour)
+table(allpix_plot$label)
+```
+
+### PCA
+
+```{r}
+allpca = prcomp(allpix_plot[,which(colnames(allpix_plot) == 'H') : which(colnames(allpix_plot) == 'V')])
+library(ggbiplot)
+ggbiplot(allpca, group = as.factor(allpix_plot$label))
+```
+
+```{r}
+ggbiplot(allpca, 2:3, group = as.factor(allpix_plot$label))
+```
+
+### Put things in perspective: human learning     
+
+At a first step, I'd like to show how this task is difficult for conventional/naive classification methods. As an example, I am showing the result of a hard thresholding method. Looking at the distribution along the H-S-V axes of the floral pixels, I am classifying all pixels that fall within the [0.01, 0.99] range of these distributions to be "floral".   
+
+```{r}
+floralpix = allpix_plot[allpix_plot$label == 'floral',]
+filtered_pix = allpix_plot[allpix_plot$H > quantile(floralpix$H, 0.01) & allpix_plot$H < quantile(floralpix$H, 0.99) & allpix_plot$S > quantile(floralpix$S, 0.01) & allpix_plot$S < quantile(floralpix$S, 0.99) & allpix_plot$V > quantile(floralpix$V, 0.01) & allpix_plot$V < quantile(floralpix$V, 0.99),]
+dim(filtered_pix)
+table(filtered_pix$label == "floral")[2]
+```
+
+```{r}
+dim(floralpix)
+table(filtered_pix$label == "floral")[2]/(dim(floralpix)[1])
+table(filtered_pix$label == "floral")[1]/(dim(floralpix)[1]) #0.003 false positive
+```
+
+> We can see that also the false positive rate is really low, the false negative rate  is as high as 24%. This can pose a big problem when the signal is weak. 
+
+### The real deal: Machine learning methods
+
+There are five machine learning methods we would like to test for our dataset: linear discrimination analysis (LDA), classification and regression tree (CART), K nearest neighbor (KNN), support vector machine (SVM), and random forest (RF).   
+
+```{r}
+library(caret)
+selected = sample(1:nrow(allpix_plot), ceiling(nrow(allpix_plot)/2))
+training = allpix_plot[selected,which(colnames(allpix_plot) == 'H') : which(colnames(allpix_plot) == 'label')]
+training$label = as.factor(training$label)
+table(training$label)
+validation = allpix_plot[-selected,which(colnames(allpix_plot) == 'H') : which(colnames(allpix_plot) == 'label')]
+validation$label = as.factor(validation$label)
+control <- trainControl(method="cv", number=10)
+metric <- "Accuracy"
+fit.lda <- train(label~., data=training, method="lda", metric=metric, trControl=control)
+fit.cart <- train(label~., data=training, method="rpart", metric=metric, trControl=control)
+fit.knn <- train(label~., data=training, method="knn", metric=metric, trControl=control)
+fit.svm <- train(label~., data=training, method="svmRadial", metric=metric, trControl=control)
+fit.rf <- train(label~., data=training, method="rf", metric=metric, trControl=control)
+```
+
+#### Compare results from different ML models
+
+```{r}
+results <- resamples(list(lda=fit.lda, cart=fit.cart, knn=fit.knn, svm=fit.svm, rf=fit.rf))
+summary(results)
+dotplot(results)
+```
+
+> svm outperforms everybody else. RF is a close seconod. 
+
+#### Plotting confusion matrix for svm:      
+```{r}
+selected = sample(1:nrow(allpix_plot), ceiling(nrow(allpix_plot)/2))
+training = allpix_plot[selected,which(colnames(allpix_plot) == 'H') : which(colnames(allpix_plot) == 'label')]
+training$label = as.factor(training$label)
+fit.svm = train(label~., data=training, method="svmRadial", metric=metric, trControl=control)
+testing = allpix_plot[-selected,which(colnames(allpix_plot) == 'H') : which(colnames(allpix_plot) == 'label')]
+testing$label = as.character(testing$label)
+predictions <- predict(fit.svm, testing)
+testing$label = as.factor(testing$label)
+levels(testing$label)
+confusionMatrix(predictions, testing$label)
+dim(testing)
+```
+
+#### Confusion matrix to QC results from svm ML method      
+
+```{r}
+predictions <- predict(fit.svm, validation)
+confusionMatrix(predictions, validation$label)
+```
+
+> The result looks really good! But let's not get excited too early. There are a few measures we can take to evaluate how reproducible our excellent result is.   
+
+### Test robustness of model
+
+Permutating training set to test robustness of model. What if we just got lucky with the first randomly chosen training dataset?   
+
+```{r}
+library(caret)
+
+confusion_matrices_svm = as.data.frame(matrix(0, nrow = 10, ncol = 7))
+confusion_matrices_rf = as.data.frame(matrix(0, nrow = 10, ncol = 7))
+control <- trainControl(method="cv", number=10)
+metric <- "Accuracy"
+
+for (i in 1:10) {
+  set.seed(i)
+  selected = sample(1:nrow(allpix_plot), ceiling(nrow(allpix_plot)/2))
+  training = allpix_plot[selected,which(colnames(allpix_plot) == 'H') : which(colnames(allpix_plot) == 'label')]
+  training$label = as.factor(training$label)
+  table(training$label)
+  validation = allpix_plot[-selected,which(colnames(allpix_plot) == 'H') : which(colnames(allpix_plot) == 'label')]
+  validation$label = as.factor(validation$label)
+
+  fit.svm <- train(label~., data=training, method="svmRadial", metric=metric, trControl=control)
+  fit.rf <- train(label~., data=training, method="rf", metric=metric, trControl=control)
+#results <- resamples(list(lda=fit.lda, cart=fit.cart, knn=fit.knn, svm=fit.svm, rf=fit.rf))
+#summary(results)
+#dotplot(results)
+  predictions_svm <- predict(fit.svm, validation)
+  conf.mat_svm = confusionMatrix(predictions_svm, validation$label)
+  confusion_matrices_svm[i,] = conf.mat_svm$overall
+
+  predictions_rf <- predict(fit.rf, validation)
+  conf.mat_rf = confusionMatrix(predictions_rf, validation$label)
+  confusion_matrices_rf[i,] = conf.mat_rf$overall
+}
+
+summary(confusion_matrices_svm$V1)
+summary(confusion_matrices_rf$V1)
+```
+
+#### Saturation curve:    
+
+What sized training set do you need to achieve 95% accuracy?     
+```{r}
+sat_curve_svm2 = as.data.frame(matrix(0, nrow = 7, ncol = 7))
+control <- trainControl(method="cv", number=10)
+metric <- "Accuracy"
+
+n = 1
+for (i in c(300, 500, 1000, 1500, 2000, 2500, 3000)) {
+  selected = sample(1:nrow(allpix_plot), i)
+  training = allpix_plot[selected,7:10]
+  training$label = as.factor(training$label)
+  table(training$label)
+  validation = allpix_plot[allpix_plot$hour == 15,7:10]
+  validation$label = as.factor(validation$label)
+  table(validation$label)
+
+  fit.svm <- train(label~., data=training, method="svmRadial", metric=metric, trControl=control)
+
+  predictions_svm <- predict(fit.svm, validation)
+  conf.mat_svm = confusionMatrix(predictions_svm, validation$label)
+  sat_curve_svm2[n,] = conf.mat_svm$overall
+  n = n+1
+}
+
+sat_curve_svm2 
+```
+
+> It turns out that the different pixel classes in our dataset are so clearly distinguishable from each other tahat even with only 150 data points input we can get really good prediction accuracy. Pleasant surprise!     
+
+#### Final version: use svm + entire dataset (training + testing) to build the model
+
+```{r}
+control <- trainControl(method="cv", number=10)
+metric <- "Accuracy"
+fit.svm_whole <- train(label~., data=allpix_plot[,which(colnames(allpix_plot) == 'H') : which(colnames(allpix_plot) == 'label')], method="svmRadial", metric=metric, trControl=control)
+fit.svm_whole$results
+```
+
+
+#### Deploy your model! 
+
+Now we can feed whole images into our machine learning model for prediction. You might want to run this on a super computer that you have access to. I my case, each of my field images contained more than 70 million pixels, and my little laptop obviously wasn't going to be able to handle it. I submitted my job onto a single core and the job finished running overnight.  
+
+```{r, eval = FALSE}
+library(data.table)
+library(tidyverse)
+library(raster)
+library(caret)
+library(kernlab)
+load("SVM_model.RData")
+files = list.files(path = "/share/rwmwork/rongkui/Drone/Results", pattern = "Lettuce_Multi_201907\\S+[H|S|V|E|N]\\.csv")
+file_groups = unique(substr(files, 1, 27))
+file_groups 
+rasters = list()
+large_collection = list()
+another_large_collection = list()
+
+for (i in file_groups[-1]) {
+  time = substr(i, 24, 27)
+  fileH = fread(paste(i, "_H.csv", sep = ""))
+  colnames(fileH) = as.character(1:ncol(fileH))
+  rownames(fileH) = as.character(1:nrow(fileH))
+  fileH = as.data.frame(fileH)
+  fileH['row'] = rownames(fileH)
+  tidyH = fileH %>%
+    gather(`1`:(ncol(fileH)-1), key = column, value = H)
+  
+  fileS = fread(paste(i, "_S.csv", sep = ""))
+  colnames(fileS) = as.character(1:ncol(fileS))
+  rownames(fileS) = as.character(1:nrow(fileS))
+  tidyS = fileS %>%
+    gather(`1`:ncol(fileS), key = column, value = S)
+  
+  fileV = fread(paste(i, "_V.csv", sep = ""))
+  colnames(fileV) = as.character(1:ncol(fileV))
+  rownames(fileV) = as.character(1:nrow(fileV))
+  tidyV = fileV %>%
+    gather(`1`:ncol(fileV), key = column, value = V)
+  
+  collection = as.data.frame(cbind(tidyH, tidyS['S'], tidyV['V']))
+  names(collection) = c("row","column","H","S","V")
+  collection2 = collection
+  
+  collection2['pred_label'] = predict(fit.svm_whole, collection)
+  collection2['quant'] = 0
+  collection2$quant[collection2$pred_label == 'flower'] = 255
+  collection3 = collection2[,c("row","column","quant")]
+  collection3$row = as.numeric(collection3$row)
+  collection3$column = as.numeric(collection3$column)
+  
+  large_collection[[i]] = collection2
+  another_large_collection[[i]] = collection3
+  write.csv(collection2, file = paste(i, "floral_pred_res_long.csv", sep = ""))
+  write.csv(collection3, file = paste(i, "floral_pred_res_grid.csv", sep = ""))
+}
+```
