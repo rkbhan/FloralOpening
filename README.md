@@ -7,9 +7,13 @@ output:
     keep_md: yes
 ---
 
+### Introduction
+
+Flower opening and closure are traits of reproductive importance in all angiosperms, because they determine the success of self- and cross-pollination events. Existing variations in floral opening hours have been recorded in many species, but the transient nature of this phenotype has rendered it a difficult target for genetic studies. In this document, I describe a simple method using support vector machine (SVM) to identify flowers from image series obtained by a drone-mediated remote sensing phenotyping experiment. Floral pixels were identified from the images using a support vector machine (SVM) machine learning algorithm with an accuracy above 99%.    
+
 ### Load dataset.
 
-You can find the dataset in the repository
+You can find the dataset in this repository. The dataset consists of the Hue-Saturation-Value (HSV) readouts of sample floral, vegetative and ground pixels.  
 
 ```r
 library(ggplot2)
@@ -187,7 +191,7 @@ table(training$label)
 ```
 ## 
 ##     floral     ground vegetative 
-##        782        763        859
+##        811        752        841
 ```
 
 ```r
@@ -224,19 +228,19 @@ summary(results)
 ## 
 ## Accuracy 
 ##           Min.   1st Qu.    Median      Mean   3rd Qu.      Max. NA's
-## lda  0.9456067 0.9594139 0.9667445 0.9650395 0.9708333 0.9752066    0
-## cart 0.9625000 0.9760417 0.9792099 0.9792012 0.9854383 0.9917012    0
-## knn  0.8708333 0.8844917 0.8979167 0.8968461 0.9047607 0.9333333    0
-## svm  0.9751037 0.9833506 0.9875259 0.9875346 0.9916926 1.0000000    0
-## rf   0.9708333 0.9843750 0.9875519 0.9858593 0.9906380 0.9958333    0
+## lda  0.9377593 0.9594139 0.9667358 0.9634008 0.9708333 0.9709544    0
+## cart 0.9666667 0.9708636 0.9750519 0.9775328 0.9823435 0.9917012    0
+## knn  0.8630705 0.8724066 0.8833333 0.8818741 0.8909621 0.8958333    0
+## svm  0.9709544 0.9875000 0.9875259 0.9879461 0.9937630 0.9958333    0
+## rf   0.9751037 0.9802732 0.9854772 0.9866978 0.9916667 1.0000000    0
 ## 
 ## Kappa 
 ##           Min.   1st Qu.    Median      Mean   3rd Qu.      Max. NA's
-## lda  0.9183529 0.9390984 0.9500435 0.9475042 0.9561970 0.9627520    0
-## cart 0.9436943 0.9640143 0.9687652 0.9687580 0.9781262 0.9875365    0
-## knn  0.8057644 0.8262621 0.8463544 0.8448278 0.8568047 0.8997180    0
-## svm  0.9625757 0.9749833 0.9812669 0.9812735 0.9875259 1.0000000    0
-## rf   0.9561747 0.9765082 0.9813045 0.9787601 0.9859395 0.9937422    0
+## lda  0.9066133 0.9390933 0.9500413 0.9450467 0.9561927 0.9564038    0
+## cart 0.9499609 0.9562785 0.9625440 0.9662675 0.9734853 0.9875336    0
+## knn  0.7937714 0.8077253 0.8245542 0.8222264 0.8360377 0.8435300    0
+## svm  0.9563970 0.9812313 0.9812667 0.9819004 0.9906325 0.9937441    0
+## rf   0.9625873 0.9703899 0.9782031 0.9800240 0.9874851 1.0000000    0
 ```
 
 ```r
@@ -274,32 +278,32 @@ confusionMatrix(predictions, testing$label)
 ## 
 ##             Reference
 ## Prediction   floral ground vegetative
-##   floral        761      2          1
-##   ground          7    773          6
-##   vegetative     10      4        839
+##   floral        758      0          3
+##   ground          2    771          9
+##   vegetative      4      7        849
 ## 
 ## Overall Statistics
 ##                                           
-##                Accuracy : 0.9875          
-##                  95% CI : (0.9822, 0.9916)
-##     No Information Rate : 0.3521          
-##     P-Value [Acc > NIR] : < 2e-16         
+##                Accuracy : 0.9896          
+##                  95% CI : (0.9847, 0.9933)
+##     No Information Rate : 0.3583          
+##     P-Value [Acc > NIR] : <2e-16          
 ##                                           
-##                   Kappa : 0.9813          
+##                   Kappa : 0.9844          
 ##                                           
-##  Mcnemar's Test P-Value : 0.01448         
+##  Mcnemar's Test P-Value : 0.495           
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: floral Class: ground Class: vegetative
-## Sensitivity                 0.9781        0.9923            0.9917
-## Specificity                 0.9982        0.9920            0.9910
-## Pos Pred Value              0.9961        0.9835            0.9836
-## Neg Pred Value              0.9896        0.9963            0.9955
-## Prevalence                  0.3238        0.3242            0.3521
-## Detection Rate              0.3167        0.3217            0.3491
-## Detection Prevalence        0.3179        0.3271            0.3550
-## Balanced Accuracy           0.9882        0.9921            0.9914
+## Sensitivity                 0.9921        0.9910            0.9861
+## Specificity                 0.9982        0.9932            0.9929
+## Pos Pred Value              0.9961        0.9859            0.9872
+## Neg Pred Value              0.9963        0.9957            0.9922
+## Prevalence                  0.3179        0.3238            0.3583
+## Detection Rate              0.3154        0.3208            0.3533
+## Detection Prevalence        0.3167        0.3254            0.3579
+## Balanced Accuracy           0.9952        0.9921            0.9895
 ```
 
 ```r
@@ -323,32 +327,32 @@ confusionMatrix(predictions, validation$label)
 ## 
 ##             Reference
 ## Prediction   floral ground vegetative
-##   floral        776      1          1
-##   ground          6    788          3
-##   vegetative      5      5        818
+##   floral        753      1          3
+##   ground          2    797          6
+##   vegetative      3      7        831
 ## 
 ## Overall Statistics
 ##                                           
-##                Accuracy : 0.9913          
-##                  95% CI : (0.9867, 0.9946)
-##     No Information Rate : 0.3421          
-##     P-Value [Acc > NIR] : < 2e-16         
+##                Accuracy : 0.9908          
+##                  95% CI : (0.9862, 0.9943)
+##     No Information Rate : 0.3496          
+##     P-Value [Acc > NIR] : <2e-16          
 ##                                           
-##                   Kappa : 0.9869          
+##                   Kappa : 0.9863          
 ##                                           
-##  Mcnemar's Test P-Value : 0.08073         
+##  Mcnemar's Test P-Value : 0.9381          
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: floral Class: ground Class: vegetative
-## Sensitivity                 0.9860        0.9924            0.9951
-## Specificity                 0.9988        0.9944            0.9937
-## Pos Pred Value              0.9974        0.9887            0.9879
-## Neg Pred Value              0.9932        0.9963            0.9975
-## Prevalence                  0.3275        0.3304            0.3421
-## Detection Rate              0.3229        0.3279            0.3404
-## Detection Prevalence        0.3238        0.3317            0.3446
-## Balanced Accuracy           0.9924        0.9934            0.9944
+## Sensitivity                 0.9934        0.9901            0.9893
+## Specificity                 0.9976        0.9950            0.9936
+## Pos Pred Value              0.9947        0.9901            0.9881
+## Neg Pred Value              0.9970        0.9950            0.9942
+## Prevalence                  0.3154        0.3350            0.3496
+## Detection Rate              0.3134        0.3317            0.3458
+## Detection Prevalence        0.3150        0.3350            0.3500
+## Balanced Accuracy           0.9955        0.9925            0.9914
 ```
 
 > The result looks really good! But let's not get excited too early. There are a few measures we can take to evaluate how reproducible our excellent result is.   
