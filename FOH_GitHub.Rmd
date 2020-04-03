@@ -7,9 +7,13 @@ output:
     keep_md: yes
 ---
 
+### Introduction
+
+Flower opening and closure are traits of reproductive importance in all angiosperms, because they determine the success of self- and cross-pollination events. Existing variations in floral opening hours have been recorded in many species, but the transient nature of this phenotype has rendered it a difficult target for genetic studies. In this document, I describe a simple method using support vector machine (SVM) to identify flowers from image series obtained by a drone-mediated remote sensing phenotyping experiment. Floral pixels were identified from the images using a support vector machine (SVM) machine learning algorithm with an accuracy above 99%.    
+
 ### Load dataset.
 
-You can find the dataset in the repository
+You can find the dataset in this repository. The dataset consists of the Hue-Saturation-Value (HSV) readouts of sample floral, vegetative and ground pixels.  
 ```{r}
 library(ggplot2)
 library(GGally)
