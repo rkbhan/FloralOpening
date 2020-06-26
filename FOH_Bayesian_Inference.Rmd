@@ -2,6 +2,108 @@
 title: "FOT Bayesian Inference"
 author: "Rongkui Han"
 date: "6/26/2020"
-output: html_document
+output: 
+  html_document: 
+    keep_md: yes
 ---
+
+## Part II: Bayesian Inference of Peak Floral Opening Time (FOT)
+
+### Introduction
+
+In Part I we successfully identified floral pixels from drone images using SVM. Here we will take the output of the machine learning algorithm and infer the time point at which each plot of plants reached its daily peak floral opening. The tidied output of the machine learning algorithm can be found in this repository under FOH_GitHub_files/MLoutput_std_pxl_ct.csv. The "std_pxl_ct" data resulted from transforming the raw ML output in these two steps:
+
+1. Aggregation. To calculate the floral pixel count within individual plots at each time point. The GPS-coordinates of the border of individual plots will be made available in a public repository along with the GPS-anchored aerial image of the field soon.
+
+2. Standardization. The maximum daily floral pixel count per plot is adjusted to 1. 
+
+```{r}
+library(rethinking)
+library(tidyverse)
+library(dplyr)
+```
+
+
+```{r}
+MLres = read.csv("/Users/rongkui/Desktop/Lab/Aim4_FloweringHour/FloralOpening/FOH_GitHub_files/MLoutput_std_pxl_ct.csv", row.names = 1)
+colnames(MLres) = gsub("X","",colnames(MLres))
+MLres$Block = as.factor(MLres$Block)
+MLres = MLres[order(MLres$plot),]
+MLres['tracker'] = seq(1, nrow(MLres), by = 1)
+pix_ct_narrow = MLres %>%
+  gather(`9`:`16`, key = hour, value = std_pxl_ct)
+pix_ct_narrow$hour = as.numeric(pix_ct_narrow$hour)
+head(pix_ct_narrow)
+```
+
+
+### Bayesian modeling
+
+The whole process will take hours. We will demonstrate the output using a handful of plots. 
+
+```{r}
+re_pix_ct_narrow = pix_ct_narrow[pix_ct_narrow$RIL == "RIL51" | pix_ct_narrow$RIL == "RIL29" | pix_ct_narrow$RIL == "RIL214" ,]
+```
+
+
+```{r}
+res_list = list()
+for (i in unique(re_pix_ct_narrow$tracker)) {
+  re_pix_ct_test = re_pix_ct_narrow[re_pix_ct_narrow$tracker == i, ]
+  data = list(
+    pixel = re_pix_ct_test$std_pxl_ct,
+    gxb = re_pix_ct_test$tracker,
+    hour = re_pix_ct_test$hour
+  )
+  mod_test = ulam(
+    alist(
+      pixel ~ dnorm(mu, sigma_pxl),
+      mu <- exp(-0.5 * (hour - peak)^2 / duration),
+      peak ~ dnorm(12,1),
+      duration ~ dexp(1),
+      sigma_pxl ~ dexp(2)
+    ), data = data, chains = 4, cores = 4, iter = 2000
+  )
+  res = precis(mod_test, depth = 2)
+  res_peak = res[1,]
+  res_dur = res[2,]
+  resreplot = c(Names = rownames(res_peak), Est_peak = res_peak$mean, Rhat_peak = res_peak$Rhat, Est_dur = res_dur$mean, Rhat_dur = res_dur$Rhat)
+  resreplot['tracker'] = i
+  res_list[[i]] = resreplot
+}
+
+res_df = as.data.frame(do.call(rbind, res_list))
+res_df
+```
+
+### Plot the output with the input
+
+```{r}
+plotting = merge(re_pix_ct_narrow, res_df, by = 'tracker')
+plotting = plotting %>% 
+  spread(key = hour, value = std_pxl_ct)
+plotting$Est_peak = as.numeric(as.character(plotting$Est_peak))
+plotting$Est_dur = as.numeric(as.character(plotting$Est_dur))
+
+for (i in unique(plotting$RIL)) {
+  
+  ril_table = plotting[plotting$RIL == i,]
+  Peak_est_1 = ril_table$Est_peak[which(ril_table$Block == '1')]
+  Peak_est_2 = ril_table$Est_peak[which(ril_table$Block == '2')]
+  Dur_est_1 = ril_table$Est_dur[which(ril_table$Block == '1')]
+  Dur_est_2 = ril_table$Est_dur[which(ril_table$Block == '2')]
+  ril_table = ril_table %>%
+    gather(`9`:`16`, key = hour, value = std_pxl_ct)
+  ril_table$hour = as.numeric(ril_table$hour)
+  
+  print(ggplot(ril_table, aes(x = hour, y = std_pxl_ct, group = plot, color = Block)) +
+  stat_function(fun = function(x) dnorm(x, mean = Peak_est_1, sd = sqrt(Dur_est_1)) * sqrt(2 * 3.14 * Dur_est_1), size = 2, alpha = 0.3, color = '#F8766D') +
+  stat_function(fun = function(x) dnorm(x, mean = Peak_est_2, sd = sqrt(Dur_est_2)) * sqrt(2 * 3.14 * Dur_est_2), size = 2, alpha = 0.3, color = "#00BFC4") +
+  geom_line() +
+  ggtitle(label = i) +
+  ylab("Standardized pixel count")) +
+  theme(axis.text.x = element_text(size=24), axis.text.y = element_text(size=24), axis.title = element_text(size = 24))
+  
+}
+```
 
