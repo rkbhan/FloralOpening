@@ -1,0 +1,7 @@
+---
+title: "FOT Bayesian Inference"
+author: "Rongkui Han"
+date: "6/26/2020"
+output: html_document
+---
+

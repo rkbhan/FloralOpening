@@ -1,7 +1,7 @@
 ---
 title: "Machine learning for high throughput image phenotyping"
 author: "Rongkui Han"
-date: "3/19/2020"
+date: "6/26/2020"
 output: 
   html_document: 
     keep_md: yes
@@ -9,38 +9,46 @@ output:
 
 ### Introduction
 
-Flower opening and closure are traits of reproductive importance in all angiosperms, because they determine the success of self- and cross-pollination events. Existing variations in floral opening hours have been recorded in many species, but the transient nature of this phenotype has rendered it a difficult target for genetic studies. In this document, I describe a simple method using support vector machine (SVM) to identify flowers from image series obtained by a drone-mediated remote sensing phenotyping experiment. Floral pixels were identified from the images using a support vector machine (SVM) machine learning algorithm with an accuracy above 99%.    
+Flower opening and closure are traits of reproductive importance in all angiosperms, because they determine the success of self- and cross-pollination events. Existing variations in floral opening hours have been recorded in many species, but the temporal nature of this phenotype has rendered it a difficult target for genetic studies. In this document, I describe a simple method using support vector machine (SVM) to identify flowers from image series obtained by a drone-based remote sensing phenotyping experiment. Floral pixels were identified from the images using a support vector machine (SVM) machine learning algorithm with an accuracy above 99%.    
 
 ### Load dataset.
 
-You can find the dataset in this repository. The dataset consists of the Hue-Saturation-Value (HSV) readouts of sample floral, vegetative and ground pixels.  
+You can find the dataset in this repository under FOH_GitHub_files/Labeled_pixel_samples.csv. The dataset consists of the Hue-Saturation-Value (HSV) readouts of sample floral, vegetative and ground pixels.  
+
 ```{r}
 library(ggplot2)
 library(GGally)
 library(gridExtra)
-allpix_plot = read.csv("/Users/rongkui/Desktop/Lab/Aim4_FloweringHour/Results/Labeled_pixel_samples.csv")
+allpix_plot = read.csv("/Users/rongkui/Desktop/Lab/Aim4_FloweringHour/FloralOpening/FOH_GitHub_files/Labeled_pixel_samples.csv")
 
 allpix_pairs = allpix_plot[,c("H","S","V","label")]
 allpix_hour = allpix_plot[,c("H","S","V","hour")]
 allpix_hour$hour = as.factor(allpix_hour$hour)
+```
 
-ggpairs(allpix_pairs, aes(colour = label, alpha = 0.4), title = "(a)")
+
+```{r, echo = FALSE}
+tab = table(allpix_pairs$label)
+```
+
+There are `r tab[1]` floral pixels, `r tab[3]` vegetative pixels, and `r tab[2]` ground pixels. The HSV distribution of the pixels of different categories looks like:
+
+```{r}
+p = ggpairs(allpix_pairs, aes(colour = label, alpha = 0.4), title = "(a)")
+for(i in 1:p$nrow) {
+  for(j in 1:p$ncol){
+    p[i,j] <- p[i,j] + 
+        scale_fill_manual(values=c("gold", "tan4", "forestgreen")) +
+        scale_color_manual(values=c("gold", "tan4", "forestgreen"))  
+  }
+}
+p
+```
+
+These samples were taken from seven separate images, each represent one time point of the day (9 am, 10 am, 11 am, 12 am, 1 pm, 3 pm and 4pm).
+
+```{r}
 ggpairs(allpix_hour, aes(colour = hour, alpha = 0.4), title = "(b)")
-
-table(allpix_plot$label, allpix_plot$hour)
-table(allpix_plot$label)
-```
-
-### PCA
-
-```{r}
-allpca = prcomp(allpix_plot[,which(colnames(allpix_plot) == 'H') : which(colnames(allpix_plot) == 'V')])
-library(ggbiplot)
-ggbiplot(allpca, group = as.factor(allpix_plot$label))
-```
-
-```{r}
-ggbiplot(allpca, 2:3, group = as.factor(allpix_plot$label))
 ```
 
 ### Put things in perspective: human learning     
@@ -60,7 +68,7 @@ table(filtered_pix$label == "floral")[2]/(dim(floralpix)[1])
 table(filtered_pix$label == "floral")[1]/(dim(floralpix)[1]) #0.003 false positive
 ```
 
-> We can see that also the false positive rate is really low, the false negative rate  is as high as 24%. This can pose a big problem when the signal is weak. 
+**We can see that although the false positive rate is really low, the false negative rate is as high as 24%. This can pose a big problem when the signal is weak. **
 
 ### The real deal: Machine learning methods
 
@@ -156,11 +164,14 @@ summary(confusion_matrices_svm$V1)
 summary(confusion_matrices_rf$V1)
 ```
 
-#### Saturation curve:    
+**Both the SVM model and the RF model are robust against different randomizations. **
+
+#### Saturation process:    
 
 What sized training set do you need to achieve 95% accuracy?     
 ```{r}
 sat_curve_svm2 = as.data.frame(matrix(0, nrow = 7, ncol = 7))
+colnames(sat_curve_svm2) = c("Accuracy","Kappa","AccuracyLower","AccuracyUpper","AccuracyNull","AccuracyPValue","McnemarPValue")
 control <- trainControl(method="cv", number=10)
 metric <- "Accuracy"
 
@@ -185,7 +196,7 @@ for (i in c(300, 500, 1000, 1500, 2000, 2500, 3000)) {
 sat_curve_svm2 
 ```
 
-> It turns out that the different pixel classes in our dataset are so clearly distinguishable from each other tahat even with only 150 data points input we can get really good prediction accuracy. Pleasant surprise!     
+**Column 1, "Accuracy" is what we are most interested in. It turns out that the different pixel classes in our dataset are so clearly distinguishable from each other tahat even with only 150 data points input we can get really good prediction accuracy. Pleasant surprise!**     
 
 #### Final version: use svm + entire dataset (training + testing) to build the model
 
@@ -196,10 +207,9 @@ fit.svm_whole <- train(label~., data=allpix_plot[,which(colnames(allpix_plot) ==
 fit.svm_whole$results
 ```
 
-
 #### Deploy your model! 
 
-Now we can feed whole images into our machine learning model for prediction. You might want to run this on a super computer that you have access to. I my case, each of my field images contained more than 70 million pixels, and my little laptop obviously wasn't going to be able to handle it. I submitted my job onto a single core and the job finished running overnight.  
+Now we can feed whole images into our machine learning model for prediction. You might want to run this on a super computer that you have access to. In my case, each of my field images contained more than 70 million pixels, and my little laptop obviously wasn't going to be able to handle it. I submitted my job onto a single core and the job finished running overnight. The spatial images used here will be made available on a public repository soon. I will update the information here as soon as the upload completes. 
 
 ```{r, eval = FALSE}
 library(data.table)

@@ -1,7 +1,7 @@
 ---
 title: "Machine learning for high throughput image phenotyping"
 author: "Rongkui Han"
-date: "3/19/2020"
+date: "6/26/2020"
 output: 
   html_document: 
     keep_md: yes
@@ -9,11 +9,12 @@ output:
 
 ### Introduction
 
-Flower opening and closure are traits of reproductive importance in all angiosperms, because they determine the success of self- and cross-pollination events. Existing variations in floral opening hours have been recorded in many species, but the transient nature of this phenotype has rendered it a difficult target for genetic studies. In this document, I describe a simple method using support vector machine (SVM) to identify flowers from image series obtained by a drone-mediated remote sensing phenotyping experiment. Floral pixels were identified from the images using a support vector machine (SVM) machine learning algorithm with an accuracy above 99%.    
+Flower opening and closure are traits of reproductive importance in all angiosperms, because they determine the success of self- and cross-pollination events. Existing variations in floral opening hours have been recorded in many species, but the temporal nature of this phenotype has rendered it a difficult target for genetic studies. In this document, I describe a simple method using support vector machine (SVM) to identify flowers from image series obtained by a drone-based remote sensing phenotyping experiment. Floral pixels were identified from the images using a support vector machine (SVM) machine learning algorithm with an accuracy above 99%.    
 
 ### Load dataset.
 
-You can find the dataset in this repository. The dataset consists of the Hue-Saturation-Value (HSV) readouts of sample floral, vegetative and ground pixels.  
+You can find the dataset in this repository under FOH_GitHub_files/Labeled_pixel_samples.csv. The dataset consists of the Hue-Saturation-Value (HSV) readouts of sample floral, vegetative and ground pixels.  
+
 
 ```r
 library(ggplot2)
@@ -28,25 +29,41 @@ library(GGally)
 
 ```r
 library(gridExtra)
-allpix_plot = read.csv("/Users/rongkui/Desktop/Lab/Aim4_FloweringHour/Results/Labeled_pixel_samples.csv")
+allpix_plot = read.csv("/Users/rongkui/Desktop/Lab/Aim4_FloweringHour/FloralOpening/FOH_GitHub_files/Labeled_pixel_samples.csv")
 
 allpix_pairs = allpix_plot[,c("H","S","V","label")]
 allpix_hour = allpix_plot[,c("H","S","V","hour")]
 allpix_hour$hour = as.factor(allpix_hour$hour)
+```
 
-ggpairs(allpix_pairs, aes(colour = label, alpha = 0.4), title = "(a)")
+
+
+
+There are 1569 floral pixels, 1681 vegetative pixels, and 1557 ground pixels. The HSV distribution of the pixels of different categories looks like:
+
+
+```r
+p = ggpairs(allpix_pairs, aes(colour = label, alpha = 0.4), title = "(a)")
+for(i in 1:p$nrow) {
+  for(j in 1:p$ncol){
+    p[i,j] <- p[i,j] + 
+        scale_fill_manual(values=c("gold", "tan4", "forestgreen")) +
+        scale_color_manual(values=c("gold", "tan4", "forestgreen"))  
+  }
+}
+p
 ```
 
 ```
 ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
-```
-
-```
 ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
 ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
 ```
 
-![](FOH_GitHub_files/figure-html/unnamed-chunk-1-1.png)<!-- -->
+![](FOH_GitHub_files/figure-html/unnamed-chunk-3-1.png)<!-- -->
+
+These samples were taken from seven separate images, each represent one time point of the day (9 am, 10 am, 11 am, 12 am, 1 pm, 3 pm and 4pm).
+
 
 ```r
 ggpairs(allpix_hour, aes(colour = hour, alpha = 0.4), title = "(b)")
@@ -58,62 +75,7 @@ ggpairs(allpix_hour, aes(colour = hour, alpha = 0.4), title = "(b)")
 ## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
 ```
 
-![](FOH_GitHub_files/figure-html/unnamed-chunk-1-2.png)<!-- -->
-
-```r
-table(allpix_plot$label, allpix_plot$hour)
-```
-
-```
-##             
-##                9  10  11  12  13  15  16
-##   floral     151 300 306 300 300 120  92
-##   ground     162 284 301 284 282 120 124
-##   vegetative 149 316 295 316 332 129 144
-```
-
-```r
-table(allpix_plot$label)
-```
-
-```
-## 
-##     floral     ground vegetative 
-##       1569       1557       1681
-```
-
-### PCA
-
-
-```r
-allpca = prcomp(allpix_plot[,which(colnames(allpix_plot) == 'H') : which(colnames(allpix_plot) == 'V')])
-library(ggbiplot)
-```
-
-```
-## Loading required package: plyr
-```
-
-```
-## Loading required package: scales
-```
-
-```
-## Loading required package: grid
-```
-
-```r
-ggbiplot(allpca, group = as.factor(allpix_plot$label))
-```
-
-![](FOH_GitHub_files/figure-html/unnamed-chunk-2-1.png)<!-- -->
-
-
-```r
-ggbiplot(allpca, 2:3, group = as.factor(allpix_plot$label))
-```
-
-![](FOH_GitHub_files/figure-html/unnamed-chunk-3-1.png)<!-- -->
+![](FOH_GitHub_files/figure-html/unnamed-chunk-4-1.png)<!-- -->
 
 ### Put things in perspective: human learning     
 
@@ -127,7 +89,7 @@ dim(filtered_pix)
 ```
 
 ```
-## [1] 1201   11
+## [1] 1201   10
 ```
 
 ```r
@@ -145,7 +107,7 @@ dim(floralpix)
 ```
 
 ```
-## [1] 1569   11
+## [1] 1569   10
 ```
 
 ```r
@@ -166,7 +128,7 @@ table(filtered_pix$label == "floral")[1]/(dim(floralpix)[1]) #0.003 false positi
 ## 0.003824092
 ```
 
-> We can see that also the false positive rate is really low, the false negative rate  is as high as 24%. This can pose a big problem when the signal is weak. 
+**We can see that although the false positive rate is really low, the false negative rate is as high as 24%. This can pose a big problem when the signal is weak. **
 
 ### The real deal: Machine learning methods
 
@@ -191,7 +153,7 @@ table(training$label)
 ```
 ## 
 ##     floral     ground vegetative 
-##        811        752        841
+##        797        782        825
 ```
 
 ```r
@@ -228,26 +190,26 @@ summary(results)
 ## 
 ## Accuracy 
 ##           Min.   1st Qu.    Median      Mean   3rd Qu.      Max. NA's
-## lda  0.9377593 0.9594139 0.9667358 0.9634008 0.9708333 0.9709544    0
-## cart 0.9666667 0.9708636 0.9750519 0.9775328 0.9823435 0.9917012    0
-## knn  0.8630705 0.8724066 0.8833333 0.8818741 0.8909621 0.8958333    0
-## svm  0.9709544 0.9875000 0.9875259 0.9879461 0.9937630 0.9958333    0
-## rf   0.9751037 0.9802732 0.9854772 0.9866978 0.9916667 1.0000000    0
+## lda  0.9375000 0.9513516 0.9583333 0.9617286 0.9770482 0.9793388    0
+## cart 0.9666667 0.9792531 0.9813361 0.9816942 0.9875000 0.9958333    0
+## knn  0.8583333 0.8848548 0.8962656 0.8960232 0.9032287 0.9375000    0
+## svm  0.9750000 0.9874737 0.9896437 0.9900189 0.9958290 1.0000000    0
+## rf   0.9791667 0.9833506 0.9875259 0.9883489 0.9916926 1.0000000    0
 ## 
 ## Kappa 
 ##           Min.   1st Qu.    Median      Mean   3rd Qu.      Max. NA's
-## lda  0.9066133 0.9390933 0.9500413 0.9450467 0.9561927 0.9564038    0
-## cart 0.9499609 0.9562785 0.9625440 0.9662675 0.9734853 0.9875336    0
-## knn  0.7937714 0.8077253 0.8245542 0.8222264 0.8360377 0.8435300    0
-## svm  0.9563970 0.9812313 0.9812667 0.9819004 0.9906325 0.9937441    0
-## rf   0.9625873 0.9703899 0.9782031 0.9800240 0.9874851 1.0000000    0
+## lda  0.9062109 0.9270192 0.9374853 0.9425791 0.9655644 0.9690069    0
+## cart 0.9499961 0.9688693 0.9719978 0.9725346 0.9812485 0.9937485    0
+## knn  0.7871786 0.8271489 0.8442750 0.8438863 0.8546883 0.9061449    0
+## svm  0.9624863 0.9812066 0.9844618 0.9850243 0.9937425 1.0000000    0
+## rf   0.9687451 0.9750223 0.9812829 0.9825196 0.9875337 1.0000000    0
 ```
 
 ```r
 dotplot(results)
 ```
 
-![](FOH_GitHub_files/figure-html/unnamed-chunk-7-1.png)<!-- -->
+![](FOH_GitHub_files/figure-html/unnamed-chunk-8-1.png)<!-- -->
 
 > svm outperforms everybody else. RF is a close seconod. 
 
@@ -278,32 +240,32 @@ confusionMatrix(predictions, testing$label)
 ## 
 ##             Reference
 ## Prediction   floral ground vegetative
-##   floral        758      0          3
-##   ground          2    771          9
-##   vegetative      4      7        849
+##   floral        774      1          5
+##   ground          3    792          3
+##   vegetative      4      9        812
 ## 
 ## Overall Statistics
 ##                                           
 ##                Accuracy : 0.9896          
 ##                  95% CI : (0.9847, 0.9933)
-##     No Information Rate : 0.3583          
+##     No Information Rate : 0.3412          
 ##     P-Value [Acc > NIR] : <2e-16          
 ##                                           
 ##                   Kappa : 0.9844          
 ##                                           
-##  Mcnemar's Test P-Value : 0.495           
+##  Mcnemar's Test P-Value : 0.2497          
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: floral Class: ground Class: vegetative
-## Sensitivity                 0.9921        0.9910            0.9861
-## Specificity                 0.9982        0.9932            0.9929
-## Pos Pred Value              0.9961        0.9859            0.9872
-## Neg Pred Value              0.9963        0.9957            0.9922
-## Prevalence                  0.3179        0.3238            0.3583
-## Detection Rate              0.3154        0.3208            0.3533
-## Detection Prevalence        0.3167        0.3254            0.3579
-## Balanced Accuracy           0.9952        0.9921            0.9895
+## Sensitivity                 0.9910        0.9875            0.9902
+## Specificity                 0.9963        0.9963            0.9918
+## Pos Pred Value              0.9923        0.9925            0.9842
+## Neg Pred Value              0.9957        0.9938            0.9949
+## Prevalence                  0.3250        0.3337            0.3412
+## Detection Rate              0.3221        0.3296            0.3379
+## Detection Prevalence        0.3246        0.3321            0.3433
+## Balanced Accuracy           0.9937        0.9919            0.9910
 ```
 
 ```r
@@ -327,32 +289,32 @@ confusionMatrix(predictions, validation$label)
 ## 
 ##             Reference
 ## Prediction   floral ground vegetative
-##   floral        753      1          3
-##   ground          2    797          6
-##   vegetative      3      7        831
+##   floral        764      1          3
+##   ground          4    766          4
+##   vegetative      4      8        849
 ## 
 ## Overall Statistics
 ##                                           
-##                Accuracy : 0.9908          
-##                  95% CI : (0.9862, 0.9943)
-##     No Information Rate : 0.3496          
+##                Accuracy : 0.99            
+##                  95% CI : (0.9852, 0.9936)
+##     No Information Rate : 0.3562          
 ##     P-Value [Acc > NIR] : <2e-16          
 ##                                           
-##                   Kappa : 0.9863          
+##                   Kappa : 0.985           
 ##                                           
-##  Mcnemar's Test P-Value : 0.9381          
+##  Mcnemar's Test P-Value : 0.351           
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: floral Class: ground Class: vegetative
-## Sensitivity                 0.9934        0.9901            0.9893
-## Specificity                 0.9976        0.9950            0.9936
-## Pos Pred Value              0.9947        0.9901            0.9881
-## Neg Pred Value              0.9970        0.9950            0.9942
-## Prevalence                  0.3154        0.3350            0.3496
-## Detection Rate              0.3134        0.3317            0.3458
-## Detection Prevalence        0.3150        0.3350            0.3500
-## Balanced Accuracy           0.9955        0.9925            0.9914
+## Sensitivity                 0.9896        0.9884            0.9918
+## Specificity                 0.9975        0.9951            0.9922
+## Pos Pred Value              0.9948        0.9897            0.9861
+## Neg Pred Value              0.9951        0.9945            0.9955
+## Prevalence                  0.3213        0.3225            0.3562
+## Detection Rate              0.3179        0.3188            0.3533
+## Detection Prevalence        0.3196        0.3221            0.3583
+## Balanced Accuracy           0.9936        0.9917            0.9920
 ```
 
 > The result looks really good! But let's not get excited too early. There are a few measures we can take to evaluate how reproducible our excellent result is.   
@@ -434,12 +396,15 @@ summary(confusion_matrices_rf$V1)
 ##  0.9813  0.9842  0.9856  0.9855  0.9867  0.9896
 ```
 
-#### Saturation curve:    
+**Both the SVM model and the RF model are robust against different randomizations. **
+
+#### Saturation process:    
 
 What sized training set do you need to achieve 95% accuracy?     
 
 ```r
 sat_curve_svm2 = as.data.frame(matrix(0, nrow = 7, ncol = 7))
+colnames(sat_curve_svm2) = c("Accuracy","Kappa","AccuracyLower","AccuracyUpper","AccuracyNull","AccuracyPValue","McnemarPValue")
 control <- trainControl(method="cv", number=10)
 metric <- "Accuracy"
 
@@ -465,17 +430,25 @@ sat_curve_svm2
 ```
 
 ```
-##          V1        V2        V3        V4        V5            V6  V7
-## 1 0.9647696 0.9470968 0.9405085 0.9811104 0.3495935 3.738787e-142 NaN
-## 2 0.9783198 0.9674829 0.9577298 0.9905946 0.3495935 4.310604e-151 NaN
-## 3 0.9810298 0.9715306 0.9613063 0.9923398 0.3495935 5.112513e-153 NaN
-## 4 0.9837398 0.9756025 0.9649461 0.9940100 0.3495935 5.291093e-155 NaN
-## 5 0.9864499 0.9796708 0.9686634 0.9955861 0.3495935 4.680792e-157 NaN
-## 6 0.9837398 0.9755928 0.9649461 0.9940100 0.3495935 5.291093e-155 NaN
-## 7 0.9837398 0.9756025 0.9649461 0.9940100 0.3495935 5.291093e-155 NaN
+##    Accuracy     Kappa AccuracyLower AccuracyUpper AccuracyNull AccuracyPValue
+## 1 0.9647696 0.9470968     0.9405085     0.9811104    0.3495935  3.738787e-142
+## 2 0.9783198 0.9674829     0.9577298     0.9905946    0.3495935  4.310604e-151
+## 3 0.9810298 0.9715306     0.9613063     0.9923398    0.3495935  5.112513e-153
+## 4 0.9837398 0.9756025     0.9649461     0.9940100    0.3495935  5.291093e-155
+## 5 0.9864499 0.9796708     0.9686634     0.9955861    0.3495935  4.680792e-157
+## 6 0.9837398 0.9755928     0.9649461     0.9940100    0.3495935  5.291093e-155
+## 7 0.9837398 0.9756025     0.9649461     0.9940100    0.3495935  5.291093e-155
+##   McnemarPValue
+## 1           NaN
+## 2           NaN
+## 3           NaN
+## 4           NaN
+## 5           NaN
+## 6           NaN
+## 7           NaN
 ```
 
-> It turns out that the different pixel classes in our dataset are so clearly distinguishable from each other tahat even with only 150 data points input we can get really good prediction accuracy. Pleasant surprise!     
+**Column 1, "Accuracy" is what we are most interested in. It turns out that the different pixel classes in our dataset are so clearly distinguishable from each other tahat even with only 150 data points input we can get really good prediction accuracy. Pleasant surprise!**     
 
 #### Final version: use svm + entire dataset (training + testing) to build the model
 
@@ -494,10 +467,9 @@ fit.svm_whole$results
 ## 3 0.9800399 1.00 0.9902209 0.9853221 0.003806662 0.005713412
 ```
 
-
 #### Deploy your model! 
 
-Now we can feed whole images into our machine learning model for prediction. You might want to run this on a super computer that you have access to. I my case, each of my field images contained more than 70 million pixels, and my little laptop obviously wasn't going to be able to handle it. I submitted my job onto a single core and the job finished running overnight.  
+Now we can feed whole images into our machine learning model for prediction. You might want to run this on a super computer that you have access to. In my case, each of my field images contained more than 70 million pixels, and my little laptop obviously wasn't going to be able to handle it. I submitted my job onto a single core and the job finished running overnight. The spatial images used here will be made available on a public repository soon. I will update the information here as soon as the upload completes. 
 
 
 ```r
