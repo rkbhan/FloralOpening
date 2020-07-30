@@ -12,6 +12,8 @@ output:
 
 Flower opening and closure are traits of reproductive importance in all angiosperms, because they determine the success of self- and cross-pollination events. Existing variations in floral opening hours have been recorded in many species, but the transient nature of this phenotype has rendered it a difficult target for genetic studies. In this repository, I describe a two-step method that infers peak floral opening time of different plant accessions from time-stamped drone images.
 
+Publication (preprint) associated with this method can be found here: https://www.biorxiv.org/content/10.1101/2020.07.16.206953v1!
+
 ### Step 1
 
 In FOH_Machine_Learning.md, you will find a simple method using support vector machine (SVM) to identify flowers from image series obtained by a drone-mediated remote sensing phenotyping experiment.
